@@ -14,6 +14,9 @@ use clap::{App, Arg};
 
 #[tokio::main]
 async fn main() {
+    dotenv().ok();
+    let OPENAI_API_KEY = env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY is not set");
+
     let matches = App::new("GitHub Data Fetcher")
         .version("1.0")
         .author("Your Name")
@@ -64,10 +67,10 @@ async fn main() {
                 let query = format!("github user {}", login);
                 match search_bing(&bing_key, &query).await {
                     Some(search_data) => {
-                        println!(
-                            "Found on profile: {}\nFound with search: {}",
-                            pro, search_data
-                        );
+                        // println!(
+                        //     "Found on profile: {}\nFound with search: {}",
+                        //     pro, search_data
+                        // );
                     }
                     None => {
                         println!("Error searching Bing: ");

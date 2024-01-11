@@ -526,6 +526,10 @@ pub async fn get_commits_in_range(
     struct CommitUserDetails {
         date: Option<DateTime<Utc>>,
     }
+    use tokio::time::Instant;
+    let start_time = Instant::now();
+
+
     let token_str = match &token {
         None => String::from(""),
         Some(t) => format!("&token={}", t.as_str()),
@@ -588,6 +592,12 @@ pub async fn get_commits_in_range(
         git_memory_vec = weekly_git_memory_vec.clone();
     }
     let count = git_memory_vec.len();
+    let elapsed = start_time.elapsed();
+    println!(
+        "Time elapsed in get_commits_in_range is: {} seconds",
+        elapsed.as_secs(),
+    );
+
     Some((count, git_memory_vec, weekly_git_memory_vec))
 }
 
@@ -981,10 +991,10 @@ pub async fn search_issue(search_query: &str) -> anyhow::Result<String> {
                         match &page_info.end_cursor {
                             Some(end_cursor) => {
                                 cursor = Some(end_cursor.clone());
-                                println!(
-                                    "Fetched a page, moving to next page with cursor: {}",
-                                    end_cursor
-                                );
+                                // println!(
+                                //     "Fetched a page, moving to next page with cursor: {}",
+                                //     end_cursor
+                                // );
                                 continue;
                             }
                             None => {

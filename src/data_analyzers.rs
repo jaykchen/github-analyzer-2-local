@@ -545,7 +545,7 @@ pub async fn analyze_commit_integrated(
         .await
         .map_err(|e| anyhow::anyhow!("Failed to read response text: {}", e))?;
 
-    println!("{:?}", text.clone()); // let mut stripped_texts = String::with_capacity(text.len());
+    // println!("{:?}", text.clone()); // let mut stripped_texts = String::with_capacity(text.len());
 
     // 'commit_text_block: {
     //     let lines_count = text.lines().count();
@@ -649,6 +649,8 @@ pub async fn process_commits(
 ) -> Option<String> {
     let mut commits_summaries = String::new();
     let mut processed_count = 0; // Number of processed entries
+    use tokio::time::Instant;
+    let start_time = Instant::now();
 
     for commit_obj in inp_vec.iter_mut() {
         match analyze_commit_integrated(
@@ -683,6 +685,11 @@ pub async fn process_commits(
         println!("No commits processed");
         return None;
     }
+    let elapsed = start_time.elapsed();
+    println!(
+        "Time elapsed in process commit is: {} seconds",
+        elapsed.as_secs(),
+    );
 
     Some(commits_summaries)
 }
