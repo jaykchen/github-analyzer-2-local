@@ -1,16 +1,14 @@
 pub mod data_analyzers;
 pub mod github_data_fetchers;
-pub mod reports;
 pub mod utils;
-use data_analyzers::{get_repo_info, get_repo_overview_by_scraper, search_bing};
+use data_analyzers::*;
 use dotenv::dotenv;
-use github_data_fetchers::get_user_data_by_login;
-use reports::*;
+use github_data_fetchers::*;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::env;
 
-use clap::{App, Arg};
+use clap::{ App, Arg };
 
 #[tokio::main]
 async fn main() {
@@ -25,83 +23,75 @@ async fn main() {
             Arg::with_name("login")
                 .long("login")
                 .help("Specifies the user login for GitHub")
-                .takes_value(true),
+                .takes_value(true)
         )
         .arg(
             Arg::with_name("about_repo")
                 .long("about-repo")
                 .help("Provides information about a specific repository")
-                .takes_value(true),
+                .takes_value(true)
         )
         .arg(
             Arg::with_name("owner")
                 .long("owner")
                 .help("Specifies the owner of the repository")
-                .takes_value(true),
+                .takes_value(true)
         )
         .arg(
             Arg::with_name("repo")
                 .long("repo")
                 .help("Specifies the repository name")
-                .takes_value(true),
+                .takes_value(true)
         )
         .arg(
             Arg::with_name("username")
                 .long("username")
                 .help("Specifies the GitHub username")
-                .takes_value(true),
+                .takes_value(true)
         )
         .arg(
             Arg::with_name("token")
                 .long("token")
                 .help("Specifies the GitHub token for authentication")
-                .takes_value(true),
+                .takes_value(true)
         )
         .get_matches();
+    let n_days = 7u16;
 
-    if let Some(login) = matches.value_of("login") {
-        let bing_key =
-            env::var("bing_key").expect("Bing key was not present in environment variables");
-        match get_user_data_by_login(login).await {
-            Ok(pro) => {
-                let query = format!("github user {}", login);
-                match search_bing(&bing_key, &query).await {
-                    Some(search_data) => {
-                        // println!(
-                        //     "Found on profile: {}\nFound with search: {}",
-                        //     pro, search_data
-                        // );
-                    }
-                    None => {
-                        println!("Error searching Bing: ");
-                        std::process::exit(1);
-                    }
-                }
-            }
-            Err(e) => {
-                println!("Error getting user data: {}", e);
-                std::process::exit(1);
-            }
-        }
-    }
+    // let contributors_set;
 
-    if let Some(about_repo) = matches.value_of("about_repo") {
-        match get_repo_overview_by_scraper(about_repo).await {
-            Some(summary) => {
-                println!("About {}: {}", about_repo, summary);
-            }
-            None => {
-                println!("Error getting repository overview: ");
-                std::process::exit(1);
-            }
-        }
-    }
-
+    let mut _profile_data = String::new();
     if let (Some(owner), Some(repo)) = (matches.value_of("owner"), matches.value_of("repo")) {
         let username = matches.value_of("username").map(String::from);
-        let token = matches.value_of("token").map(String::from);
+        // let token = matches.value_of("token").map(String::from);
 
-        let report = weekly_report(owner, repo, username, token).await;
-        println!("Weekly report for {}/{}:\n{}", owner, repo, report);
+        // match is_valid_owner_repo(owner, repo).await {
+        //     Err(_e) => {
+        //         println!(
+        //             "You've entered invalid owner/repo, or the target is private. Please try again."
+        //         );
+        //     }
+        //     Ok((_, _, inner_set)) => {
+        //         contributors_set = inner_set;
+        //     }
+        // }
+        let mut commits_map = std::collections::HashMap::<String, (String, String)>::new();
+        match
+            get_commits_in_range_search(
+                owner,
+                repo,
+                username.clone(),
+                n_days,
+                Some(String::from(""))
+            ).await
+        {
+            Some((count, commits_vec)) => {
+                let _ = process_commits(commits_vec, &mut commits_map, Some(String::from(""))).await;
+            }
+            None => println!("failed to get commits"),
+        }
+        for (key, value) in commits_map {
+            println!("user: {}  url:{} summary: {}", key, value.0, value.1);
+        }
     }
 }

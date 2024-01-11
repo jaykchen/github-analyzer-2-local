@@ -1,15 +1,6 @@
-use async_openai::{
-    types::{
-        // ChatCompletionFunctionsArgs, ChatCompletionRequestMessage,
-        ChatCompletionRequestSystemMessageArgs,
-        ChatCompletionRequestUserMessageArgs,
-        // ChatCompletionTool, ChatCompletionToolArgs, ChatCompletionToolType,
-        CreateChatCompletionRequestArgs,
-        // FinishReason,
-    },
-    Client,
-};
-use http_req::{request::Method, request::Request, response, uri::Uri};
+use reqwest::{Client, header};
+
+use http_req::{ request::Method, request::Request, response, uri::Uri };
 use log;
 use serde::Deserialize;
 use serde_json::Value;
@@ -66,7 +57,7 @@ pub fn squeeze_fit_remove_quoted(inp_str: &str, max_len: u16, split: f32) -> Str
 
     let body_words: Vec<&str> = body.split_whitespace().collect();
     let body_len = body_words.len();
-    let n_take_from_beginning = (body_len as f32 * split) as usize;
+    let n_take_from_beginning = ((body_len as f32) * split) as usize;
     let n_keep_till_end = body_len - n_take_from_beginning;
 
     // Range check for drain operation
@@ -76,13 +67,9 @@ pub fn squeeze_fit_remove_quoted(inp_str: &str, max_len: u16, split: f32) -> Str
         body_len
     };
 
-    let drain_end = if n_keep_till_end <= body_len {
-        body_len - n_keep_till_end
-    } else {
-        0
-    };
+    let drain_end = if n_keep_till_end <= body_len { body_len - n_keep_till_end } else { 0 };
 
-    let final_text = if body_len > max_len as usize {
+    let final_text = if body_len > (max_len as usize) {
         let mut body_text_vec = body_words.to_vec();
         body_text_vec.drain(drain_start..drain_end);
         body_text_vec.join(" ")
@@ -98,7 +85,7 @@ pub fn squeeze_fit_post_texts(inp_str: &str, max_len: u16, split: f32) -> String
 
     let input_token_vec = bpe.encode_ordinary(inp_str);
     let input_len = input_token_vec.len();
-    if input_len < max_len as usize {
+    if input_len < (max_len as usize) {
         return inp_str.to_string();
     }
     // // Filter out the tokens corresponding to lines with undesired patterns
@@ -109,8 +96,8 @@ pub fn squeeze_fit_post_texts(inp_str: &str, max_len: u16, split: f32) -> String
     //         filtered_tokens.extend(tokens_for_line.drain(..));
     //     }
     // }
-    let n_take_from_beginning = (input_len as f32 * split).ceil() as usize;
-    let n_take_from_end = max_len as usize - n_take_from_beginning;
+    let n_take_from_beginning = ((input_len as f32) * split).ceil() as usize;
+    let n_take_from_end = (max_len as usize) - n_take_from_beginning;
 
     let mut concatenated_tokens = Vec::with_capacity(max_len as usize);
     concatenated_tokens.extend_from_slice(&input_token_vec[..n_take_from_beginning]);
@@ -121,14 +108,14 @@ pub fn squeeze_fit_post_texts(inp_str: &str, max_len: u16, split: f32) -> String
         .map_or("failed to decode tokens".to_string(), |s| s.to_string())
 }
 
-pub async fn chain_of_chat(
+/* pub async fn chain_of_chat(
     sys_prompt_1: &str,
     usr_prompt_1: &str,
     chat_id: &str,
     gen_len_1: u16,
     usr_prompt_2: &str,
     gen_len_2: u16,
-    error_tag: &str,
+    error_tag: &str
 ) -> anyhow::Result<String> {
     let client = Client::new();
 
@@ -138,10 +125,7 @@ pub async fn chain_of_chat(
             .build()
             .expect("Failed to build system message")
             .into(),
-        ChatCompletionRequestUserMessageArgs::default()
-            .content(usr_prompt_1)
-            .build()?
-            .into(),
+        ChatCompletionRequestUserMessageArgs::default().content(usr_prompt_1).build()?.into()
     ];
     let request = CreateChatCompletionRequestArgs::default()
         .max_tokens(gen_len_1)
@@ -155,14 +139,13 @@ pub async fn chain_of_chat(
         Some(res) => {
             // println!("{:?}", res);
         }
-        None => return Err(anyhow::anyhow!(error_tag.to_string())),
+        None => {
+            return Err(anyhow::anyhow!(error_tag.to_string()));
+        }
     }
 
     messages.push(
-        ChatCompletionRequestUserMessageArgs::default()
-            .content(usr_prompt_2)
-            .build()?
-            .into(),
+        ChatCompletionRequestUserMessageArgs::default().content(usr_prompt_2).build()?.into()
     );
 
     let request = CreateChatCompletionRequestArgs::default()
@@ -178,144 +161,52 @@ pub async fn chain_of_chat(
             // println!("{:?}", res);
             Ok(res)
         }
-        None => return Err(anyhow::anyhow!(error_tag.to_string())),
+        None => {
+            return Err(anyhow::anyhow!(error_tag.to_string()));
+        }
     }
-}
+} */
 
 pub async fn chat_inner(
     system_prompt: &str,
     user_input: &str,
     max_token: u16,
-    model: &str,
 ) -> anyhow::Result<String> {
-    use tokio::time::Instant;
-    let start_time = Instant::now();
+    use serde::{ Serialize };
 
+    #[derive(Serialize)]
+    struct Payload {
+        prompt: String,
+        n_predict: u16,
+    }
+
+    #[derive(Deserialize)]
+    struct ChatResponse {
+        content: String,
+    }
     let client = Client::new();
 
-    let messages = vec![
-        ChatCompletionRequestSystemMessageArgs::default()
-            .content(system_prompt)
-            .build()
-            .expect("Failed to build system message")
-            .into(),
-        ChatCompletionRequestUserMessageArgs::default()
-            .content(user_input)
-            .build()?
-            .into(),
-    ];
-    let request = CreateChatCompletionRequestArgs::default()
-        .max_tokens(max_token)
-        .model(model)
-        .messages(messages)
-        .build()?;
+    let full_prompt = format!("{}{}", system_prompt, user_input);
 
-    let chat = client.chat().create(request).await?;
-
-    // let check = chat.choices.get(0).clone().unwrap();
-    // send_message_to_channel("ik8", "general", format!("{:?}", check)).await;
-
-    match chat.choices[0].message.clone().content {
-        Some(res) => {
-            println!("{:?}", chat.choices[0].message.clone());
-            let elapsed = start_time.elapsed();
-            println!(
-                "Time elapsed in chat_inner is: {} seconds",
-                elapsed.as_secs(),
-            );
-
-            Ok(res)
-        }
-        None => Err(anyhow::anyhow!("Failed to get reply from OpenAI")),
-    }
-}
-/* pub async fn chain_of_chat(
-    sys_prompt_1: &str,
-    usr_prompt_1: &str,
-    chat_id: &str,
-    gen_len_1: u16,
-    usr_prompt_2: &str,
-    gen_len_2: u16,
-    error_tag: &str,
-) -> Option<String> {
-    let openai = OpenAIFlows::new();
-
-    let co_1 = ChatOptions {
-        model: ChatModel::GPT35Turbo16K,
-        restart: true,
-        system_prompt: Some(sys_prompt_1),
-        max_tokens: Some(gen_len_1),
-        temperature: Some(0.7),
-        ..Default::default()
+    let request_payload = Payload {
+        prompt: full_prompt,
+        n_predict: max_token,
     };
 
-    match openai.chat_completion(chat_id, usr_prompt_1, &co_1).await {
-        Ok(res_1) => {
-            let sys_prompt_2 = serde_json::json!([{"role": "system", "content": sys_prompt_1},
-    {"role": "user", "content": usr_prompt_1},
-    {"role": "assistant", "content": &res_1.choice}])
-            .to_string();
+    let response = client
+        .post("http://127.0.0.1:8080/completion")
+        .json(&request_payload)
+        .header(header::CONTENT_TYPE, "application/json")
+        .send().await?;
 
-            let co_2 = ChatOptions {
-                model: ChatModel::GPT35Turbo16K,
-                restart: false,
-                system_prompt: Some(&sys_prompt_2),
-                max_tokens: Some(gen_len_2),
-                temperature: Some(0.7),
-                ..Default::default()
-            };
-            match openai.chat_completion(chat_id, usr_prompt_2, &co_2).await {
-                Ok(res_2) => {
-                    if res_2.choice.len() < 10 {
-                        println!(
-                            "{}, GPT generation went sideway: {:?}",
-                            error_tag,
-                            res_2.choice
-                        );
-                        return None;
-                    }
-                    return Some(res_2.choice);
-                }
-                Err(_e) => println!("{}, Step 2 GPT generation error {:?}", error_tag, _e),
-            };
-        }
-        Err(_e) => println!("{}, Step 1 GPT generation error {:?}", error_tag, _e),
+    if response.status().is_success() {
+        let chat_response = response.json::<ChatResponse>().await?;
+        println!("{:?}", chat_response.content.clone());
+        Ok(chat_response.content)
+    } else {
+        Err(anyhow::anyhow!("Request failed with status: {}", response.status()))
     }
-
-    None
-} */
-
-/* pub async fn save_user(owner: &str, repo: &str, user_name: &str) -> bool {
-    use std::hash::Hasher;
-    use twox_hash::XxHash;
-    let repo_string = format!("{owner}/{repo}");
-    let mut hasher = XxHash::with_seed(0);
-    hasher.write(repo_string.as_bytes());
-    let hash = hasher.finish();
-    let key = &format!("{:x}", hash);
-
-    let mut existing_users: HashSet<String> = get(key)
-        .and_then(|val| serde_json::from_value(val).ok())
-        .unwrap_or_else(HashSet::new);
-
-    // Check if the user_name already exists
-    let already_exists = existing_users.contains(user_name);
-
-    // If the user_name is not in the set, add it
-    if !already_exists {
-        existing_users.insert(user_name.to_string());
-    }
-
-    // Save updated records
-    set(
-        key,
-        Value::String(serde_json::to_string(&existing_users).unwrap()),
-        None,
-    );
-
-    // If the user_name was added, return true; otherwise, return false
-    !already_exists
-} */
+}
 
 pub fn custom_json_parser(input: &str) -> Option<String> {
     #[derive(Debug, Deserialize)]
@@ -327,15 +218,17 @@ pub fn custom_json_parser(input: &str) -> Option<String> {
         concise_summary: Option<String>,
     }
 
-    let mut parsed_data: std::collections::HashMap<String, serde_json::Value> =
-        std::collections::HashMap::new();
+    let mut parsed_data: std::collections::HashMap<
+        String,
+        serde_json::Value
+    > = std::collections::HashMap::new();
 
     let lines: Vec<&str> = input.lines().collect();
     for line in lines {
         if line.trim().starts_with("\"") {
             let parts: Vec<&str> = line.split(':').collect();
             if parts.len() >= 2 {
-                let key = parts[0].trim_matches(|c| c == '"' || c == ' ');
+                let key = parts[0].trim_matches(|c| (c == '"' || c == ' '));
                 let value: String = parts[1..].join(":");
 
                 if value.len() >= 15 {
@@ -391,7 +284,6 @@ pub fn custom_json_parser(input: &str) -> Option<String> {
 
 pub fn parse_summary_from_raw_json(input: &str) -> String {
     #[derive(Deserialize, Debug)]
-
     struct SummaryStruct {
         impactful: Option<String>,
         alignment: Option<String>,
@@ -423,4 +315,51 @@ pub fn parse_summary_from_raw_json(input: &str) -> String {
             acc.push_str(field);
             acc
         })
+}
+
+
+pub async fn github_http_get(url: &str) -> anyhow::Result<Vec<u8>> {
+    use http_req::{ request::Method, request::Request, uri::Uri };
+    let token = std::env::var("GITHUB_TOKEN").expect("github_token is required");
+    let mut writer = Vec::new();
+    let url = Uri::try_from(url).unwrap();
+
+    match
+        Request::new(&url)
+            .method(Method::GET)
+            .header("User-Agent", "flows-network connector")
+            .header("Content-Type", "application/json")
+            .header("Authorization", &format!("Bearer {}", token))
+            .header("CONNECTION", "close")
+            .send(&mut writer)
+    {
+        Ok(res) => {
+            if !res.status_code().is_success() {
+                log::error!("Github http error {:?}", res.status_code());
+                return Err(anyhow::anyhow!("Github http error {:?}", res.status_code()));
+            }
+            Ok(writer)
+        }
+        Err(_e) => {
+            log::error!("Error getting response from Github: {:?}", _e);
+            Err(anyhow::anyhow!(_e))
+        }
+    }
+}
+
+pub fn parse_issue_summary_from_json(input: &str) -> anyhow::Result<Vec<(String, String)>> {
+    let parsed: serde_json::Map<String, serde_json::Value> = serde_json::from_str(input)?;
+
+    let summaries = parsed
+        .iter()
+        .filter_map(|(key, value)| {
+            if let Some(summary_str) = value.as_str() {
+                Some((key.clone(), summary_str.to_owned()))
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<(String, String)>>(); // Collect into a Vec of tuples
+
+    Ok(summaries)
 }

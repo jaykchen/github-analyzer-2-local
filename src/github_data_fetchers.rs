@@ -1,12 +1,12 @@
-use crate::{reports, utils::*};
+use crate::{ utils::* };
 use anyhow::anyhow;
-use chrono::{DateTime, Duration, NaiveDate, Utc};
+use chrono::{ DateTime, Duration, NaiveDate, Utc };
 use derivative::Derivative;
-use http_req::response::{self, Response};
-use octocrab::models::{issues::Comment, issues::Issue, Repository};
+use http_req::response::{ self, Response };
+use octocrab::models::{ issues::Comment, issues::Issue, Repository };
 use octocrab::Octocrab;
 
-use serde::{Deserialize, Serialize};
+use serde::{ Deserialize, Serialize };
 use serde_json;
 use std::ascii::AsciiExt;
 
@@ -21,7 +21,6 @@ pub struct GitMemory {
     pub source_url: String,
     #[derivative(Default(value = "String::from(\"\")"))]
     pub payload: String,
-    pub date: NaiveDate,
 }
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum MemoryType {
@@ -54,10 +53,7 @@ pub async fn get_user_profile(user: &str) -> Option<User> {
         .build()
         .expect("octocrab failed to build");
 
-    octocrab
-        .get::<User, _, ()>(&user_profile_url, None::<&()>)
-        .await
-        .ok()
+    octocrab.get::<User, _, ()>(&user_profile_url, None::<&()>).await.ok()
 }
 
 pub async fn get_user_data_by_login(login: &str) -> anyhow::Result<String> {
@@ -155,9 +151,7 @@ pub async fn get_user_data_by_login(login: &str) -> anyhow::Result<String> {
             };
 
             let date_str = match &user.created_at {
-                Some(date) => {
-                    format!("Created At: {},", date.date_naive().to_string())
-                }
+                Some(date) => { format!("Created At: {},", date.date_naive().to_string()) }
                 None => String::new(),
             };
 
@@ -184,8 +178,9 @@ pub async fn get_community_profile_data(owner: &str, repo: &str) -> Option<Strin
         // documentation: Option<String>,
     }
 
-    let community_profile_url =
-        format!("https://api.github.com/repos/{owner}/{repo}/community/profile");
+    let community_profile_url = format!(
+        "https://api.github.com/repos/{owner}/{repo}/community/profile"
+    );
 
     let token = std::env::var("GITHUB_TOKEN").expect("GITHUB_TOKEN env variable is required");
     let octocrab = Octocrab::builder()
@@ -193,10 +188,7 @@ pub async fn get_community_profile_data(owner: &str, repo: &str) -> Option<Strin
         .build()
         .expect("octocrab failed to build");
 
-    match octocrab
-        .get::<CommunityProfile, _, ()>(&community_profile_url, None::<&()>)
-        .await
-    {
+    match octocrab.get::<CommunityProfile, _, ()>(&community_profile_url, None::<&()>).await {
         Ok(profile) => {
             return Some(format!("Description: {}", profile.description));
         }
@@ -249,13 +241,9 @@ pub async fn get_contributors(owner: &str, repo: &str) -> Result<Vec<String>, oc
     'outer: for n in 1..50 {
         println!("contributors loop {}", n);
 
-        let contributors_route =
-            format!("repos/{owner}/{repo}/contributors?per_page=100&page={n}",);
+        let contributors_route = format!("https://api.github.com/repos/{owner}/{repo}/contributors?per_page=100&page={n}");
 
-        match octocrab
-            .get::<Vec<GithubUser>, _, ()>(&contributors_route, None::<&()>)
-            .await
-        {
+        match octocrab.get::<Vec<GithubUser>, _, ()>(&contributors_route, None::<&()>).await {
             Ok(user_vec) => {
                 if user_vec.is_empty() {
                     break 'outer;
@@ -291,23 +279,21 @@ pub async fn get_readme(owner: &str, repo: &str) -> Option<String> {
         .build()
         .expect("octocrab failed to build");
 
-    match octocrab
-        .get::<GithubReadme, _, ()>(&readme_url, None::<&()>)
-        .await
-    {
+    match octocrab.get::<GithubReadme, _, ()>(&readme_url, None::<&()>).await {
         Ok(readme) => {
             if let Some(c) = readme.content {
                 let cleaned_content = c.replace("\n", "");
                 match base64::decode(&cleaned_content) {
-                    Ok(decoded_content) => match String::from_utf8(decoded_content) {
-                        Ok(out) => {
-                            return Some(format!("Readme: {}", out));
+                    Ok(decoded_content) =>
+                        match String::from_utf8(decoded_content) {
+                            Ok(out) => {
+                                return Some(format!("Readme: {}", out));
+                            }
+                            Err(e) => {
+                                println!("Failed to convert cleaned readme to String: {:?}", e);
+                                return None;
+                            }
                         }
-                        Err(e) => {
-                            println!("Failed to convert cleaned readme to String: {:?}", e);
-                            return None;
-                        }
-                    },
                     Err(e) => {
                         println!("Error decoding base64 content: {:?}", e);
                         None
@@ -338,23 +324,21 @@ pub async fn get_readme_owner_repo(about_repo: &str) -> Option<String> {
         .build()
         .expect("octocrab failed to build");
 
-    match octocrab
-        .get::<GithubReadme, _, ()>(&readme_url, None::<&()>)
-        .await
-    {
+    match octocrab.get::<GithubReadme, _, ()>(&readme_url, None::<&()>).await {
         Ok(readme) => {
             if let Some(c) = readme.content {
                 let cleaned_content = c.replace("\n", "");
                 match base64::decode(&cleaned_content) {
-                    Ok(decoded_content) => match String::from_utf8(decoded_content) {
-                        Ok(out) => {
-                            return Some(format!("Readme: {}", out));
+                    Ok(decoded_content) =>
+                        match String::from_utf8(decoded_content) {
+                            Ok(out) => {
+                                return Some(format!("Readme: {}", out));
+                            }
+                            Err(e) => {
+                                println!("Failed to convert cleaned readme to String: {:?}", e);
+                                return None;
+                            }
                         }
-                        Err(e) => {
-                            println!("Failed to convert cleaned readme to String: {:?}", e);
-                            return None;
-                        }
-                    },
                     Err(e) => {
                         println!("Error decoding base64 content: {:?}", e);
                         None
@@ -376,7 +360,7 @@ pub async fn get_issues_in_range(
     repo: &str,
     user_name: Option<String>,
     range: u16,
-    token: Option<String>,
+    token: Option<String>
 ) -> Option<(usize, Vec<Issue>)> {
     #[derive(Debug, Deserialize)]
     struct Page<T> {
@@ -396,10 +380,8 @@ pub async fn get_issues_in_range(
         None => String::new(),
         Some(t) => format!("&token={}", t.as_str()),
     };
-    let url_str = format!(
-        "https://api.github.com/search/issues?q={}&sort=updated&order=desc&per_page=100{token_str}",
-        encoded_query
-    );
+    let url_str =
+        format!("https://api.github.com/search/issues?q={}&sort=updated&order=desc&per_page=100{token_str}", encoded_query);
     // let url_str = format!(
     //     "https://api.github.com/search/issues?q={}&sort=updated&order=desc&per_page=100{token_str}",
     //     encoded_query
@@ -412,10 +394,7 @@ pub async fn get_issues_in_range(
         .build()
         .expect("octocrab failed to build");
 
-    match octocrab
-        .get::<Page<Issue>, _, ()>(&url_str, None::<&()>)
-        .await
-    {
+    match octocrab.get::<Page<Issue>, _, ()>(&url_str, None::<&()>).await {
         Err(e) => {
             println!("error: {:?}", e);
         }
@@ -436,8 +415,7 @@ pub async fn get_issue_texts(issue: &Issue) -> Option<String> {
     };
     let issue_url = &issue.url.to_string();
 
-    let labels = issue
-        .labels
+    let labels = issue.labels
         .iter()
         .map(|lab| lab.name.clone())
         .collect::<Vec<String>>()
@@ -445,7 +423,10 @@ pub async fn get_issue_texts(issue: &Issue) -> Option<String> {
 
     let mut all_text_from_issue = format!(
         "User '{}', opened an issue titled '{}', labeled '{}', with the following post: '{}'.",
-        issue_creator_name, issue_title, labels, issue_body
+        issue_creator_name,
+        issue_title,
+        labels,
+        issue_body
     );
 
     let mut current_page = 1;
@@ -458,15 +439,9 @@ pub async fn get_issue_texts(issue: &Issue) -> Option<String> {
             .build()
             .expect("octocrab failed to build");
 
-        match octocrab
-            .get::<Vec<Comment>, _, ()>(&url_str, None::<&()>)
-            .await
-        {
+        match octocrab.get::<Vec<Comment>, _, ()>(&url_str, None::<&()>).await {
             Err(_e) => {
-                println!(
-                    "Error parsing Vec<Comment> at page {}: {:?}",
-                    current_page, _e
-                );
+                println!("Error parsing Vec<Comment> at page {}: {:?}", current_page, _e);
                 break;
             }
             Ok(comments_obj) => {
@@ -494,13 +469,19 @@ pub async fn get_issue_texts(issue: &Issue) -> Option<String> {
     Some(all_text_from_issue)
 }
 
-pub async fn get_commits_in_range(
+pub async fn get_commits_in_range_search(
     owner: &str,
     repo: &str,
     user_name: Option<String>,
     range: u16,
-    token: Option<String>,
-) -> Option<(usize, Vec<GitMemory>, Vec<GitMemory>)> {
+    token: Option<String>
+) -> Option<(usize, Vec<GitMemory>)> {
+    #[derive(Debug, Deserialize)]
+    struct Page<T> {
+        pub items: Vec<T>,
+        pub total_count: Option<u64>,
+    }
+
     #[derive(Debug, Deserialize, Serialize, Clone)]
     struct User {
         login: String,
@@ -510,95 +491,75 @@ pub async fn get_commits_in_range(
     struct GithubCommit {
         sha: String,
         html_url: String,
-        author: Option<User>,    // made nullable
-        committer: Option<User>, // made nullable
+        author: Option<User>, // made nullable
         commit: CommitDetails,
     }
 
     #[derive(Serialize, Deserialize, Debug)]
     struct CommitDetails {
-        author: CommitUserDetails,
         message: String,
         // committer: CommitUserDetails,
     }
-
-    #[derive(Serialize, Deserialize, Debug)]
-    struct CommitUserDetails {
-        date: Option<DateTime<Utc>>,
-    }
-    use tokio::time::Instant;
-    let start_time = Instant::now();
-
-
     let token_str = match &token {
         None => String::from(""),
         Some(t) => format!("&token={}", t.as_str()),
     };
-    let base_commit_url =
-        format!("https://api.github.com/repos/{owner}/{repo}/commits?&per_page=100{token_str}");
-    // let base_commit_url =
-    //     format!("https://api.github.com/repos/{owner}/{repo}/commits?&per_page=100{token_str}");
-
-    let mut git_memory_vec = vec![];
-    let mut weekly_git_memory_vec = vec![];
+    let author_str = match &user_name {
+        None => String::from(""),
+        Some(t) => format!("%20author:{}", t.as_str()),
+    };
     let now = Utc::now();
     let n_days_ago = (now - Duration::days(range as i64)).date_naive();
+
+    let query = format!("repo:{}/{}{}%20committer-date:>{}", owner, repo, author_str, n_days_ago);
+    // let encoded_query = urlencoding::encode(&query);
+    let mut git_memory_vec = vec![];
     let token = std::env::var("GITHUB_TOKEN").expect("GITHUB_TOKEN env variable is required");
     let octocrab = Octocrab::builder()
         .personal_token(token)
         .build()
         .expect("octocrab failed to build");
 
-    match octocrab
-        .get::<Vec<GithubCommit>, _, ()>(&base_commit_url, None::<&()>)
-        .await
-    {
-        Err(e) => {
-            println!("Error parsing commits: {:?}", e);
-        }
-        Ok(commits) => {
-            for commit in commits {
-                if let Some(commit_date) = &commit.commit.author.date {
-                    if commit_date.date_naive() <= n_days_ago {
-                        continue;
+
+    for _n in 1..3 {
+        let url_str = format!(
+            "https://api.github.com/search/commits?q={}&sort=committer-date&order=desc&per_page=100&page={}{}",
+            query,
+            _n,
+            token_str
+        );
+        // let url_str = format!(
+        //     "https://api.github.com/search/commits?q={}&sort=author-date&order=desc&per_page=100{token_str}",
+        //     encoded_query
+        // );
+
+        match octocrab.get::<Page<GithubCommit>, _, ()>(&url_str, None::<&()>).await {
+            Err(e) => {
+                log::error!("Error parsing commits: {:?}", e);
+            }
+            Ok(commits_page) => {
+                for commit in &commits_page.items {
+                    if let Some(author) = &commit.author {
+                        // log::info!("commit author: {:?}", author.clone());
+                        git_memory_vec.push(GitMemory {
+                            memory_type: MemoryType::Commit,
+                            name: author.login.clone(),
+                            tag_line: commit.commit.message.clone(),
+                            source_url: commit.html_url.clone(),
+                            payload: String::from(""),
+                        });
                     }
-                    weekly_git_memory_vec.push(GitMemory {
-                        memory_type: MemoryType::Commit,
-                        name: commit.author.clone().map_or(String::new(), |au| au.login),
-                        tag_line: commit.commit.message.clone(),
-                        source_url: commit.html_url.clone(),
-                        payload: String::from(""),
-                        date: commit_date.date_naive(),
-                    });
-                    if let Some(user_name) = &user_name {
-                        if let Some(author) = &commit.author {
-                            if author.login.as_str() == user_name {
-                                git_memory_vec.push(GitMemory {
-                                    memory_type: MemoryType::Commit,
-                                    name: author.login.clone(),
-                                    tag_line: commit.commit.message.clone(),
-                                    source_url: commit.html_url.clone(),
-                                    payload: String::from(""),
-                                    date: commit_date.date_naive(),
-                                });
-                            }
-                        }
-                    }
+                }
+                if &commits_page.items.len() < &100 {
+                 println!("commits_page.items: {:?}", &commits_page.items[0].html_url)   ;
+                    break;
                 }
             }
         }
     }
-    if user_name.is_none() {
-        git_memory_vec = weekly_git_memory_vec.clone();
-    }
     let count = git_memory_vec.len();
-    let elapsed = start_time.elapsed();
-    println!(
-        "Time elapsed in get_commits_in_range is: {} seconds",
-        elapsed.as_secs(),
-    );
 
-    Some((count, git_memory_vec, weekly_git_memory_vec))
+    Some((count, git_memory_vec))
 }
 
 pub async fn get_user_repos_in_language(user: &str, language: &str) -> Option<Vec<Repository>> {
@@ -616,10 +577,7 @@ pub async fn get_user_repos_in_language(user: &str, language: &str) -> Option<Ve
     let mut current_page = 1;
 
     loop {
-        let url_str = format!(
-            "search/repositories?q={}&page={}",
-            encoded_query, current_page
-        );
+        let url_str = format!("search/repositories?q={}&page={}", encoded_query, current_page);
 
         let token = std::env::var("GITHUB_TOKEN").expect("GITHUB_TOKEN env variable is required");
         let octocrab = Octocrab::builder()
@@ -627,10 +585,7 @@ pub async fn get_user_repos_in_language(user: &str, language: &str) -> Option<Ve
             .build()
             .expect("octocrab failed to build");
 
-        match octocrab
-            .get::<Page<Repository>, _, ()>(&url_str, None::<&()>)
-            .await
-        {
+        match octocrab.get::<Page<Repository>, _, ()>(&url_str, None::<&()>).await {
             Err(_e) => {
                 println!("Error parsing Page<Repository>: {:?}", _e);
                 break;
@@ -732,7 +687,8 @@ pub async fn get_user_repos_gql(user_name: &str, language: &str) -> Option<Strin
         }}
     }}
     "#,
-        user_name, language
+        user_name,
+        language
     );
 
     let token = std::env::var("GITHUB_TOKEN").expect("GITHUB_TOKEN env variable is required");
@@ -883,9 +839,7 @@ pub async fn search_issue(search_query: &str) -> anyhow::Result<String> {
             }}
             "#,
             search_query,
-            cursor
-                .as_ref()
-                .map_or(String::new(), |c| format!(r#", after: "{}""#, c))
+            cursor.as_ref().map_or(String::new(), |c| format!(r#", after: "{}""#, c))
         );
 
         let token = std::env::var("GITHUB_TOKEN").expect("GITHUB_TOKEN env variable is required");
@@ -921,8 +875,7 @@ pub async fn search_issue(search_query: &str) -> anyhow::Result<String> {
                         };
 
                         let assignees_str = {
-                            let assignee_names = issue
-                                .assignees
+                            let assignee_names = issue.assignees
                                 .as_ref()
                                 .and_then(|e| e.edges.as_ref())
                                 .map_or(Vec::new(), |assignee_edges| {
@@ -930,11 +883,13 @@ pub async fn search_issue(search_query: &str) -> anyhow::Result<String> {
                                         .iter()
                                         .filter_map(|edge| {
                                             edge.as_ref().and_then(|actual_edge| {
-                                                actual_edge.node.as_ref().and_then(|user| {
-                                                    user.login
-                                                        .as_ref()
-                                                        .map(|login_str| login_str.as_str())
-                                                })
+                                                actual_edge.node
+                                                    .as_ref()
+                                                    .and_then(|user| {
+                                                        user.login
+                                                            .as_ref()
+                                                            .map(|login_str| login_str.as_str())
+                                                    })
                                             })
                                         })
                                         .collect::<Vec<&str>>()
@@ -967,15 +922,13 @@ pub async fn search_issue(search_query: &str) -> anyhow::Result<String> {
                         };
 
                         let assoc_str = match &issue.author_association {
-                            Some(association) => {
-                                format!("Author Association: {}", association)
-                            }
+                            Some(association) => { format!("Author Association: {}", association) }
                             None => String::new(),
                         };
 
                         let temp = format!(
-                                "{title_str} {url_str} Created At: {date} {author_str} {assignees_str}  {state_str} {body_str} {assoc_str}"
-                            );
+                            "{title_str} {url_str} Created At: {date} {author_str} {assignees_str}  {state_str} {body_str} {assoc_str}"
+                        );
 
                         out.push_str(&temp);
                         out.push_str("\n");
@@ -999,8 +952,8 @@ pub async fn search_issue(search_query: &str) -> anyhow::Result<String> {
                             }
                             None => {
                                 println!(
-                                        "Warning: hasNextPage is true, but endCursor is None. This might result in missing data."
-                                    );
+                                    "Warning: hasNextPage is true, but endCursor is None. This might result in missing data."
+                                );
                                 break;
                             }
                         }
@@ -1100,9 +1053,7 @@ pub async fn search_repository(search_query: &str) -> anyhow::Result<String> {
             }}
             "#,
             search_query = search_query,
-            after = cursor
-                .as_ref()
-                .map_or(String::new(), |c| format!(r#", after: "{}""#, c))
+            after = cursor.as_ref().map_or(String::new(), |c| format!(r#", after: "{}""#, c))
         );
 
         let response: Payload = octocrab.graphql(&query).await?;
@@ -1155,10 +1106,10 @@ pub async fn search_repository(search_query: &str) -> anyhow::Result<String> {
                                 };
 
                                 out.push_str(
-                                        &format!(
-                                            "{name_str} {desc_str} {url_str} Created At: {date_str} {stars_str} {forks_str}\n"
-                                        )
-                                    );
+                                    &format!(
+                                        "{name_str} {desc_str} {url_str} Created At: {date_str} {stars_str} {forks_str}\n"
+                                    )
+                                );
                             }
                         }
                     }
@@ -1179,7 +1130,7 @@ pub async fn search_repository(search_query: &str) -> anyhow::Result<String> {
 
 pub async fn search_discussions_integrated(
     search_query: &str,
-    target_person: &Option<String>,
+    target_person: &Option<String>
 ) -> anyhow::Result<(String, Vec<GitMemory>)> {
     #[derive(Debug, Deserialize)]
     struct DiscussionRoot {
@@ -1282,28 +1233,21 @@ pub async fn search_discussions_integrated(
     let response: DiscussionRoot = octocrab.graphql(&query).await?;
     let empty_str = "".to_string();
 
-    if let Some(search) = response
-        .data
-        .ok_or_else(|| anyhow::Error::msg("Missing data in the response"))?
-        .search
+    if
+        let Some(search) = response.data.ok_or_else(||
+            anyhow::Error::msg("Missing data in the response")
+        )?.search
     {
-        for edge_option in search
-            .edges
+        for edge_option in search.edges
             .ok_or_else(|| anyhow::Error::msg("Missing edges in the response"))?
             .iter()
-            .filter_map(|e| e.as_ref())
-        {
+            .filter_map(|e| e.as_ref()) {
             if let Some(discussion) = &edge_option.node {
                 let date = discussion.created_at.date_naive();
                 let title = discussion.title.as_ref().unwrap_or(&empty_str).to_string();
                 let url = discussion.url.as_ref().unwrap_or(&empty_str).to_string();
-                let source_url = discussion
-                    .html_url
-                    .as_ref()
-                    .unwrap_or(&empty_str)
-                    .to_string();
-                let author_login = discussion
-                    .author
+                let source_url = discussion.html_url.as_ref().unwrap_or(&empty_str).to_string();
+                let author_login = discussion.author
                     .as_ref()
                     .and_then(|a| a.login.as_ref())
                     .unwrap_or(&empty_str)
@@ -1319,7 +1263,12 @@ pub async fn search_discussions_integrated(
                 };
                 let mut disuccsion_texts = format!(
                     "Title: '{}' Url: '{}' Body: '{}' Created At: {} {} Author: {}\n",
-                    title, url, body_text, date, upvotes_str, author_login
+                    title,
+                    url,
+                    body_text,
+                    date,
+                    upvotes_str,
+                    author_login
                 );
 
                 if let Some(comments) = &discussion.comments {
@@ -1329,17 +1278,16 @@ pub async fn search_discussions_integrated(
                                 let stripped_comment_text = squeeze_fit_remove_quoted(
                                     &comment.body.as_ref().unwrap_or(&empty_str),
                                     300,
-                                    0.6,
+                                    0.6
                                 );
-                                let comment_author = comment
-                                    .author
+                                let comment_author = comment.author
                                     .as_ref()
                                     .and_then(|a| a.login.as_ref())
                                     .unwrap_or(&empty_str);
                                 disuccsion_texts.push_str(
-                                    &(format!(
+                                    &format!(
                                         "{comment_author} comments: '{stripped_comment_text}'\n"
-                                    )),
+                                    )
                                 );
                             }
                         }
@@ -1353,23 +1301,22 @@ pub async fn search_discussions_integrated(
                 };
 
                 let sys_prompt_1 = &format!(
-                            "Analyze the provided GitHub discussion. Identify the main topic, actions by participants, crucial viewpoints, solutions or consensus reached, and particularly highlight the contributions of specific individuals, especially '{target_str}'. Summarize without being verbose."
-                        );
+                    "Analyze the provided GitHub discussion. Identify the main topic, actions by participants, crucial viewpoints, solutions or consensus reached, and particularly highlight the contributions of specific individuals, especially '{target_str}'. Summarize without being verbose."
+                );
 
                 let usr_prompt_1 = &format!(
-                            "Analyze the content: {disuccsion_texts}. Briefly summarize the central topic, participants' actions, primary viewpoints, and outcomes. Emphasize the role of '{target_str}' in driving the discussion or reaching a resolution. Aim for a succinct summary that is rich in analysis and under 192 tokens."
-                        );
+                    "Analyze the content: {disuccsion_texts}. Briefly summarize the central topic, participants' actions, primary viewpoints, and outcomes. Emphasize the role of '{target_str}' in driving the discussion or reaching a resolution. Aim for a succinct summary that is rich in analysis and under 192 tokens."
+                );
 
-                match chat_inner(sys_prompt_1, usr_prompt_1, 256, "gpt-3.5-turbo-1106").await {
+                match chat_inner(sys_prompt_1, usr_prompt_1, 256).await {
                     Ok(r) => {
-                        text_out.push_str(&(format!("{} {}", url, r)));
+                        text_out.push_str(&format!("{} {}", url, r));
                         git_mem_vec.push(GitMemory {
                             memory_type: MemoryType::Discussion,
                             name: author_login,
                             tag_line: title,
                             source_url: source_url,
                             payload: r,
-                            date: date,
                         });
                     }
 
@@ -1380,145 +1327,10 @@ pub async fn search_discussions_integrated(
     }
 
     if git_mem_vec.is_empty() {
-        Err(anyhow::anyhow!("No results found.").into())
+        Err(anyhow::Error::msg("No results found.").into())
     } else {
         Ok((text_out, git_mem_vec))
     }
 }
 
-pub async fn search_users(search_query: &str) -> anyhow::Result<String> {
-    #[derive(Debug, Deserialize)]
-    struct User {
-        name: Option<String>,
-        login: Option<String>,
-        url: Option<String>,
-        #[serde(rename = "twitterUsername")]
-        twitter_username: Option<String>,
-        bio: Option<String>,
-        company: Option<String>,
-        location: Option<String>,
-        #[serde(rename = "createdAt")]
-        created_at: Option<DateTime<Utc>>,
-        email: Option<String>,
-    }
 
-    #[derive(Debug, Deserialize)]
-    struct UserNode {
-        node: Option<User>,
-    }
-
-    #[derive(Debug, Deserialize)]
-    struct UserEdge {
-        edges: Option<Vec<Option<UserNode>>>,
-    }
-
-    #[derive(Debug, Deserialize)]
-    struct UserSearch {
-        search: Option<UserEdge>,
-    }
-
-    #[derive(Debug, Deserialize)]
-    struct UserRoot {
-        data: Option<UserSearch>,
-    }
-
-    let mut out = String::from("USERS: \n");
-    let token = std::env::var("GITHUB_TOKEN").expect("GITHUB_TOKEN env variable is required");
-    let octocrab = Octocrab::builder()
-        .personal_token(token)
-        .build()
-        .expect("octocrab failed to build");
-
-    let query = format!(
-        r#"
-        query {{
-            search(query: "{search_query}", type: USER, first: 100) {{
-                edges {{
-                    node {{
-                        ... on User {{
-                            name
-                            login
-                            url
-                            twitterUsername
-                            bio
-                            company
-                            location
-                            createdAt
-                            email
-                        }}
-                    }}
-                }}
-            }}
-        }}
-        "#,
-        search_query = search_query
-    );
-
-    let response: UserRoot = octocrab.graphql(&query).await?;
-
-    if let Some(search) = &response.data {
-        if let Some(edges) = &search.search {
-            for edge_option in edges.edges.as_ref().unwrap_or(&vec![]) {
-                if let Some(edge) = edge_option {
-                    if let Some(user) = &edge.node {
-                        let login_str = match &user.login {
-                            Some(login) => format!("Login: {},", login),
-                            None => {
-                                continue;
-                            }
-                        };
-                        let name_str = match &user.name {
-                            Some(name) => format!("Name: {},", name),
-                            None => String::new(),
-                        };
-
-                        let url_str = match &user.url {
-                            Some(url) => format!("Url: {},", url),
-                            None => String::new(),
-                        };
-
-                        let twitter_str = match &user.twitter_username {
-                            Some(twitter) => format!("Twitter: {},", twitter),
-                            None => String::new(),
-                        };
-
-                        let bio_str = match &user.bio {
-                            Some(bio) => format!("Bio: {},", bio),
-                            None => String::new(),
-                        };
-
-                        let company_str = match &user.company {
-                            Some(company) => format!("Company: {},", company),
-                            None => String::new(),
-                        };
-
-                        let location_str = match &user.location {
-                            Some(location) => format!("Location: {},", location),
-                            None => String::new(),
-                        };
-
-                        let date_str = match &user.created_at {
-                            Some(date) => {
-                                format!("Created At: {},", date.date_naive().to_string())
-                            }
-                            None => String::new(),
-                        };
-
-                        let email_str = match &user.email {
-                            Some(email) => format!("Email: {}", email),
-                            None => String::new(),
-                        };
-
-                        out.push_str(
-                                &format!(
-                                    "{name_str} {login_str} {url_str} {twitter_str} {bio_str} {company_str} {location_str} {date_str} {email_str}\n"
-                                )
-                            );
-                    }
-                }
-            }
-        }
-    }
-
-    Ok(out)
-}
